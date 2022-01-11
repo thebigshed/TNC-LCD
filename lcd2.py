@@ -8,9 +8,10 @@ import socket
 import dateutil.parser as dparser
 import numpy as np
 from signal import signal, SIGTERM, SIGHUP, pause
+# set up the display
 from rpi_lcd import LCD
 lcd = LCD()
-
+#set up the data types although Packets now not used
 mtype = [('Call','S12'), ('Packets',int),('Date', 'S19')]
 ta = np.zeros((0), dtype=mtype)
 
@@ -23,6 +24,7 @@ def to_hex(bytestr):
         for byte in bytestr
     ])
 
+# strip the callsign from the data
 def decode(data):
     if isinstance(data, (bytes, bytearray)):
         # Ensure the data is at least 7 bytes!
@@ -43,16 +45,20 @@ def decode(data):
         callsign = callsign + "-" + str(ssid)
     return callsign
 
+#Location of the mheard.dat file
 file_name = '/var/ax25/mheard/mheard.dat'
-num_bytes = Path(file_name).stat().st_size * 2
 
+#Calculate the number of bytes so you dont go off the end of the file.
+num_bytes = Path(file_name).stat().st_size * 2
+#read the file in
 with open(file_name, 'rb') as f:
     hex_addr = f.read().hex()
     
 n = 0
+#Data offsets for the items I wanted
 packet_offset = 72
 offset =232
-
+#Move the bytes around to get the correct order. Must be an easier way....
 while n < num_bytes:
     hexlist = hex_addr[n] + hex_addr[n+1] + " " + hex_addr[n+2] + hex_addr[n+3] + " " + hex_addr[n+4] + hex_addr[n+5] + " " + hex_addr[n+6] + \
         hex_addr[n+7] + " " + hex_addr[n+8] + hex_addr[n+9] + " " + \
@@ -69,13 +75,14 @@ while n < num_bytes:
     ta = np.append(ta, np.array([(str(addr), '{0:06}'.format(int(packets, 16)), recovernow)], dtype=mtype))
     n = n+512
 
+#Sort them on the "Date" column
 ta.sort(order='Date')
-
+#Find the time in the time date string for the display
 for line in range(1,4):
     temp = str(ta[0-line])
     x=temp.find(":")
     call_txt = temp[3:12] + "   " + temp[(x-2):(x+6)]
     lcd.text(call_txt, line)
 
-
+#Hostname is fixed as it never changes but the IP Could change as set for DHCP
 lcd.text("TNC2 " + socket.gethostbyname(socket.gethostname()),4)
